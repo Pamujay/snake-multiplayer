@@ -1,52 +1,107 @@
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io();
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoresDiv = document.getElementById('scores');
-
-    const GRID_SIZE = 20;
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowUp' || e.key === 'w') socket.emit('changeDirection', 'UP');
-        if (e.key === 'ArrowDown' || e.key === 's') socket.emit('changeDirection', 'DOWN');
-        if (e.key === 'ArrowLeft' || e.key === 'a') socket.emit('changeDirection', 'LEFT');
-        if (e.key === 'ArrowRight' || e.key === 'd') socket.emit('changeDirection', 'RIGHT');
-    });
-
-    socket.on('full', (msg) => alert(msg));
-
-    socket.on('gameState', (data) => {
-        const { players, food } = data;
-
-        // Render Ulang Canvas
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = '#FF0000';
-        ctx.fillRect(food.x * GRID_SIZE, food.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
-
-        scoresDiv.innerHTML = '';
-        const playerList = Object.values(players);
-
-        if (playerList.length === 0) {
-            scoresDiv.innerHTML = 'Menunggu pemain...';
-            return;
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Snake 4 Player</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            min-height: 100vh;
         }
+        #game-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        canvas {
+            border: 4px solid #fff;
+            background-color: #000;
+        }
+        #scoreboard {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            min-width: 220px;
+        }
+        .player-score {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
 
-        playerList.forEach((player, index) => {
-            const scoreElem = document.createElement('div');
-            scoreElem.className = 'player-score';
-            scoreElem.style.color = player.color;
-            scoreElem.innerText = `Player ${index + 1} ${player.id === socket.id ? '(Kamu)' : ''}: ${player.score} pts ${player.isDead ? '[GAME OVER]' : ''}`;
-            scoresDiv.appendChild(scoreElem);
+    <h1>Multiplayer Snake (Maksimal 4 PC)</h1>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div id="scoreboard">
+            <h3>Papan Skor</h3>
+            <div id="scores">Menghubungkan ke server...</div>
+        </div>
+    </div>
 
-            if (player.isDead) return;
+    <!-- Gunakan CDN CDNJS resmi untuk Socket.io Client -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoresDiv = document.getElementById('scores');
 
-            ctx.fillStyle = player.color;
-            player.snake.forEach(segment => {
-                ctx.fillRect(segment.x * GRID_SIZE, segment.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+        const GRID_SIZE = 20;
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w') socket.emit('changeDirection', 'UP');
+            if (e.key === 'ArrowDown' || e.key === 's') socket.emit('changeDirection', 'DOWN');
+            if (e.key === 'ArrowLeft' || e.key === 'a') socket.emit('changeDirection', 'LEFT');
+            if (e.key === 'ArrowRight' || e.key === 'd') socket.emit('changeDirection', 'RIGHT');
+        });
+
+        socket.on('full', (msg) => alert(msg));
+
+        socket.on('gameState', (data) => {
+            const { players, food } = data;
+
+            // Render Canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (food) {
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(food.x * GRID_SIZE, food.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+            }
+
+            scoresDiv.innerHTML = '';
+            const playerList = Object.values(players);
+
+            if (playerList.length === 0) {
+                scoresDiv.innerHTML = 'Menunggu pemain...';
+                return;
+            }
+
+            playerList.forEach((player, index) => {
+                const scoreElem = document.createElement('div');
+                scoreElem.className = 'player-score';
+                scoreElem.style.color = player.color;
+                scoreElem.innerText = `Player ${index + 1} ${player.id === socket.id ? '(Kamu)' : ''}: ${player.score} pts ${player.isDead ? '[GAME OVER]' : ''}`;
+                scoresDiv.appendChild(scoreElem);
+
+                if (player.isDead) return;
+
+                ctx.fillStyle = player.color;
+                player.snake.forEach(segment => {
+                    ctx.fillRect(segment.x * GRID_SIZE, segment.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+                });
             });
         });
-    });
-</script>
+    </script>
+</body>
+</html>
