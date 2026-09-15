@@ -1,16 +1,29 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
 
-app.use(express.static('public'));
+// Konfigurasi CORS agar Socket.io bisa diakses dari domain publik Railway
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+// Sajikan folder public secara statis
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 const GRID_SIZE = 20;
 const CANVAS_SIZE = 600;
-const COLORS = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33']; // Merah, Hijau, Biru, Kuning
+const COLORS = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33'];
 
 let players = {};
 let food = spawnFood();
@@ -23,7 +36,8 @@ function spawnFood() {
 }
 
 io.on('connection', (socket) => {
-    // Batasi maksimal 4 pemain
+    console.log('Player terhubung:', socket.id);
+
     if (Object.keys(players).length < 4) {
         const playerIndex = Object.keys(players).length;
         players[socket.id] = {
@@ -42,7 +56,7 @@ io.on('connection', (socket) => {
         socket.emit('full', 'Room penuh! Maksimal 4 pemain.');
     }
 
-    // Kirim pembaruan status langsung saat ada pemain baru
+    // Broadcast state saat ini ke pemain yang baru masuk
     io.emit('gameState', { players, food });
 
     socket.on('changeDirection', (dir) => {
@@ -56,12 +70,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        console.log('Player keluar:', socket.id);
         delete players[socket.id];
         io.emit('gameState', { players, food });
     });
 });
 
-// Game Loop (Jalan terus setiap 100ms)
+// Game Loop
 setInterval(() => {
     let activePlayers = Object.values(players).filter(p => !p.isDead);
 
@@ -73,13 +88,11 @@ setInterval(() => {
             y: player.snake[0].y + player.dy 
         };
 
-        // Tabrak tembok
         if (head.x < 0 || head.x >= CANVAS_SIZE / GRID_SIZE || head.y < 0 || head.y >= CANVAS_SIZE / GRID_SIZE) {
             player.isDead = true;
             return;
         }
 
-        // Tabrak badan sendiri atau pemain lain
         Object.values(players).forEach(otherPlayer => {
             otherPlayer.snake.forEach((segment, index) => {
                 if (otherPlayer.id === player.id && index === 0) return;
@@ -93,7 +106,6 @@ setInterval(() => {
 
         player.snake.unshift(head);
 
-        // Makan makanan
         if (head.x === food.x && head.y === food.y) {
             player.score += 10;
             food = spawnFood();
@@ -105,5 +117,8 @@ setInterval(() => {
     io.emit('gameState', { players, food });
 }, 100);
 
+// Gunakan Port 0.0.0.0 agar Railway bisa mengikat alamat publik
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server jalan di port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server berjalan di port ${PORT}`);
+});
