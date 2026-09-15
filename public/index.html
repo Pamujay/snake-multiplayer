@@ -1,181 +1,52 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Snake 4 Player</title>
-    <style>
-        body {
-            background-color: #1a1a1a;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            height: 100vh;
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoresDiv = document.getElementById('scores');
+
+    const GRID_SIZE = 20;
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'w') socket.emit('changeDirection', 'UP');
+        if (e.key === 'ArrowDown' || e.key === 's') socket.emit('changeDirection', 'DOWN');
+        if (e.key === 'ArrowLeft' || e.key === 'a') socket.emit('changeDirection', 'LEFT');
+        if (e.key === 'ArrowRight' || e.key === 'd') socket.emit('changeDirection', 'RIGHT');
+    });
+
+    socket.on('full', (msg) => alert(msg));
+
+    socket.on('gameState', (data) => {
+        const { players, food } = data;
+
+        // Render Ulang Canvas
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#FF0000';
+        ctx.fillRect(food.x * GRID_SIZE, food.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+
+        scoresDiv.innerHTML = '';
+        const playerList = Object.values(players);
+
+        if (playerList.length === 0) {
+            scoresDiv.innerHTML = 'Menunggu pemain...';
+            return;
         }
-        #game-container {
-            display: flex;
-            gap: 20px;
-        }
-        canvas {
-            border: 4px solid #fff;
-            background-color: #000;
-        }
-        #scoreboard {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            min-width: 220px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .player-status {
-            margin-bottom: 12px;
-            font-weight: bold;
-        }
-        #readyBtn {
-            padding: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        #readyBtn.is-ready {
-            background-color: #dc3545;
-        }
-        #readyBtn:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-        }
-        #game-status-msg {
-            color: #ffc107;
-            margin-bottom: 10px;
-        }
-    </style>
-</head>
-<body>
 
-    <h1>Multiplayer Snake (4 PC)</h1>
-    <div id="game-container">
-        <canvas id="gameCanvas" width="600" height="600"></canvas>
-        <div id="scoreboard">
-            <div>
-                <h3>Lobi / Papan Skor</h3>
-                <div id="game-status-msg">Menunggu pemain lain...</div>
-                <div id="scores"></div>
-            </div>
-            <button id="readyBtn">READY</button>
-        </div>
-    </div>
+        playerList.forEach((player, index) => {
+            const scoreElem = document.createElement('div');
+            scoreElem.className = 'player-score';
+            scoreElem.style.color = player.color;
+            scoreElem.innerText = `Player ${index + 1} ${player.id === socket.id ? '(Kamu)' : ''}: ${player.score} pts ${player.isDead ? '[GAME OVER]' : ''}`;
+            scoresDiv.appendChild(scoreElem);
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoresDiv = document.getElementById('scores');
-        const readyBtn = document.getElementById('readyBtn');
-        const statusMsg = document.getElementById('game-status-msg');
+            if (player.isDead) return;
 
-        const GRID_SIZE = 20;
-        let isReady = false;
-
-        // Handling Tombol Ready
-        readyBtn.addEventListener('click', () => {
-            isReady = !isReady;
-            readyBtn.innerText = isReady ? 'CANCEL READY' : 'READY';
-            readyBtn.classList.toggle('is-ready', isReady);
-            socket.emit('playerReady');
-        });
-
-        // Kontrol Keyboard
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowUp' || e.key === 'w') socket.emit('changeDirection', 'UP');
-            if (e.key === 'ArrowDown' || e.key === 's') socket.emit('changeDirection', 'DOWN');
-            if (e.key === 'ArrowLeft' || e.key === 'a') socket.emit('changeDirection', 'LEFT');
-            if (e.key === 'ArrowRight' || e.key === 'd') socket.emit('changeDirection', 'RIGHT');
-        });
-
-        socket.on('full', (msg) => {
-            alert(msg);
-            readyBtn.disabled = true;
-        });
-
-        // Update tampilan saat masih di Lobby
-        socket.on('lobbyUpdate', (data) => {
-            const { players, gameRunning } = data;
-            scoresDiv.innerHTML = '';
-
-            const playerList = Object.values(players);
-            playerList.forEach((player, index) => {
-                const item = document.createElement('div');
-                item.className = 'player-status';
-                item.style.color = player.color;
-                
-                let readyText = player.isReady ? '✅ READY' : '⏳ WAITING';
-                item.innerText = `Player ${index + 1}: ${readyText}`;
-                scoresDiv.appendChild(item);
-            });
-
-            if (!gameRunning) {
-                if (playerList.length < 2) {
-                    statusMsg.innerText = "Butuh min 2 player untuk main!";
-                } else {
-                    statusMsg.innerText = "Semua player harus tekan READY!";
-                }
-            }
-        });
-
-        socket.on('gameStarted', () => {
-            statusMsg.innerText = "🎮 Game Dimulai!";
-            readyBtn.disabled = true;
-        });
-
-        // Loop Render Game dari Server
-        socket.on('gameState', (data) => {
-            const { players, food, gameRunning } = data;
-
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            if (!gameRunning) return;
-
-            // Gambar Makanan
-            ctx.fillStyle = '#FF0000';
-            ctx.fillRect(food.x * GRID_SIZE, food.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
-
-            scoresDiv.innerHTML = '';
-            Object.values(players).forEach((player, index) => {
-                const scoreElem = document.createElement('div');
-                scoreElem.className = 'player-status';
-                scoreElem.style.color = player.color;
-                scoreElem.innerText = `Player ${index + 1}: ${player.score} pts ${player.isDead ? '💀 (DEAD)' : ''}`;
-                scoresDiv.appendChild(scoreElem);
-
-                if (player.isDead) return;
-
-                ctx.fillStyle = player.color;
-                player.snake.forEach(segment => {
-                    ctx.fillRect(segment.x * GRID_SIZE, segment.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
-                });
+            ctx.fillStyle = player.color;
+            player.snake.forEach(segment => {
+                ctx.fillRect(segment.x * GRID_SIZE, segment.y * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
             });
         });
-
-        socket.on('gameOver', (data) => {
-            statusMsg.innerText = "🏆 GAME OVER!";
-            readyBtn.disabled = false;
-            readyBtn.innerText = 'READY';
-            readyBtn.classList.remove('is-ready');
-            isReady = false;
-        });
-    </script>
-</body>
-</html>
+    });
+</script>
