@@ -51,7 +51,9 @@
     <!-- Gunakan CDN CDNJS resmi untuk Socket.io Client -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        const socket = io();
+        const socket = io(window.location.origin, {
+            transports: ['websocket', 'polling']
+        });
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoresDiv = document.getElementById('scores');
